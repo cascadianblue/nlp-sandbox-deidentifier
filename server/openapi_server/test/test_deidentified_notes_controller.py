@@ -5,7 +5,7 @@ import unittest
 from flask import json
 from openapi_server.test import BaseTestCase
 from openapi_server.test.utils import SAMPLE_NOTE, OVERLAPPING_NOTE, CONFLICTING_NOTE, PARTIAL_OVERLAP_NOTE, \
-                                      mock_get_annotations
+    mock_get_annotations, MARTIN_JAMES_NOTE
 from unittest.mock import patch
 
 
@@ -578,6 +578,56 @@ class TestDeidentifiedNotesController(BaseTestCase):
         # FIXME: This is another (arguable, see FIXME in test_partial_overlap_mask_reverse) bug from handling
         #        partially-overlapping annotations
         expected_deidentified_text = "[TEXT_PHYSICAL_ADDRESS]"
+        self.assertEqual(response_data['deidentifiedNote']['text'], expected_deidentified_text)
+
+    @patch('openapi_server.utils.annotator_client.get_annotations', new=mock_get_annotations)
+    def test_martin_james_annotation_type(self):
+        request = {
+            "note": MARTIN_JAMES_NOTE,
+            "deidentificationConfigurations": [
+                {
+                    "deidentificationStrategy": {"annotationTypeConfig": {}},
+                    "annotationTypes": ["text_physical_address", "text_person_name"]
+                }
+            ]
+        }
+
+        response = self.client.open(
+            DEIDENTIFIER_ENDPOINT_URL,
+            method='POST',
+            headers={'Accept': 'application/json'},
+            data=json.dumps(request),
+            content_type='application/json'
+        )
+        self.assertStatus(response, 200, 'Response body is : ' + response.data.decode('utf-8'))
+        response_data = response.json
+
+        expected_deidentified_text = "The patient was on [TEXT_PERSON_NAME][TEXT_PHYSICAL_ADDRESS]"
+        self.assertEqual(response_data['deidentifiedNote']['text'], expected_deidentified_text)
+
+    @patch('openapi_server.utils.annotator_client.get_annotations', new=mock_get_annotations)
+    def test_martin_james_annotation_type_reverse(self):
+        request = {
+            "note": MARTIN_JAMES_NOTE,
+            "deidentificationConfigurations": [
+                {
+                    "deidentificationStrategy": {"annotationTypeConfig": {}},
+                    "annotationTypes": ["text_person_name", "text_physical_address"]
+                }
+            ]
+        }
+
+        response = self.client.open(
+            DEIDENTIFIER_ENDPOINT_URL,
+            method='POST',
+            headers={'Accept': 'application/json'},
+            data=json.dumps(request),
+            content_type='application/json'
+        )
+        self.assertStatus(response, 200, 'Response body is : ' + response.data.decode('utf-8'))
+        response_data = response.json
+
+        expected_deidentified_text = "The patient was on [TEXT_PHYSICAL_ADDRESS]"
         self.assertEqual(response_data['deidentifiedNote']['text'], expected_deidentified_text)
 
 
